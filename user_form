@@ -1,0 +1,255 @@
+<?php 
+require_once 'core/init.php';
+$title = Config::get("info/project_name") . ' - User Form';
+$page = 'User Form';
+
+if(Input::exists()) {
+	if(Token::check(Input::get('token'))) {
+		$validate = new Validate();
+		$validation = $validate->check($_POST, array(
+			'username' => array(
+						'required' => true,
+						'min' => 2,
+						'max' => 20,
+						'unique' => 'users'
+						),
+			'password' => array(
+						'required' => true,
+						'min' => 5
+						),
+			'password_again' => array(
+						'required' => true,
+						'matches' => 'password'
+						),
+			'name' => array(
+						'required' => true,
+						'min' => 1,
+						'max' => 50
+						),
+			'question' => array(
+						'required' => true
+						),
+			'answer' => array(
+						'required' => true,
+						'min' => 2,
+						'max' => 100
+						),  
+			'position' => array(
+						'required' => true,
+						'is_numeric' => true
+						),
+			'email' => array(
+						'required' => true
+						)
+		));
+
+		$err_msg = '';
+		$file = new Upload;
+		if($validation->passed()) {
+			if (isset($_FILES['picture']) && $_FILES['picture']['name'] != '' ) {
+				if (($_FILES["picture"]["type"] != "image/jpeg")
+				&& ($_FILES["picture"]["type"] != "image/pjpeg")) {  //restriction of file format
+					$err_msg .= 'Picture file type must be in JPEG.' . '<br>';
+				} else if ($_FILES["picture"]["size"] > 3145728) {  //restriction of 3mb file size
+					$err_msg .= 'Picture file size must not be greater than 3MB.' . '<br>';
+				} else {
+					$file->uploadFile($_FILES['picture'],'users');
+				}
+			}
+			if($err_msg == ''){
+				$user = new User();
+				$salt = Hash::salt(32);
+				try {
+					if ($file->filename() == '') {
+						$user->create(array(
+							'username' => strtolower(trim(Input::get('username'))),
+							'password' => Hash::make(Input::get('password'), $salt),
+							'salt' => $salt,
+							'name' => strtoupper(trim(Input::get('name'))),
+							'joined' => date('Y-m-d H:i:s'),
+							'challenge' => Input::get('question'),
+							'answer' => strtoupper(trim(Input::get('answer'))),
+							'group' => intval(Input::get('position')),            
+							'email' => strtolower(trim(Input::get('email'))),
+							'office_no' => trim(Input::get('office_no')),
+							'mobile_no' => trim(Input::get('mobile_no'))
+						));
+					} else {
+						$user->create(array(
+							'username' => strtolower(trim(Input::get('username'))),
+							'password' => Hash::make(Input::get('password'), $salt),
+							'salt' => $salt,
+							'name' => strtoupper(trim(Input::get('name'))),
+							'joined' => date('Y-m-d H:i:s'),
+							'challenge' => Input::get('question'),
+							'answer' => strtoupper(trim(Input::get('answer'))),
+							'group' => intval(Input::get('position')),            
+							'email' => strtolower(trim(Input::get('email'))),
+							'office_no' => trim(Input::get('office_no')),
+							'mobile_no' => trim(Input::get('mobile_no')),
+							'picture' => $file->filename(),
+							'picture_url' => $file->target()
+						));
+					}
+
+					Session::delete('alert');
+					Session::flash('alert', alert_success('Registration Success.', 'User '.Input::get('username').' can now log in.'));
+				} catch(Exception $e) {
+					die($e->getMessage());
+				}
+			}
+		} else {
+			foreach($validation->errors() as $error) {
+				$err_msg .= $error . '<br>';
+			}
+			Session::delete('alert');
+			Session::flash('alert', alert_error('Error.', $err_msg));
+		}
+	}
+}
+
+$option_positions = '';
+$db = DB::getInstance()->query('SELECT * FROM groups ORDER BY `name`');
+$arr = $db->results();
+$arr_len = sizeof($arr);
+for ($a=0;$a<$arr_len;$a++) {
+	$option_positions .= '<option value="'.$arr[$a]->id.'"/>'.$arr[$a]->name;
+}    
+$option_questions = '';
+$db = DB::getInstance()->get('settings', array('option_name', '=', 'security_question', 'deleted', '=', '0'), 'ORDER BY `value`');
+$arr = $db->results();
+$arr_len = sizeof($arr);
+for ($a=0;$a<$arr_len;$a++) {
+	$option_questions .= '<option value="'.$arr[$a]->db_value.'"/>'.$arr[$a]->value;
+}
+
+include_once 'includes/header.php';
+?>
+
+		<!--Body content-->
+		<div id="content" class="clearfix">
+			<div class="contentwrapper"><!--Content wrapper-->
+			
+				<div class="heading">
+				
+					<h3><?php echo $page; ?></h3>     
+					
+					<ul class="breadcrumb">
+						<li>You are here:</li>
+						<li>
+							<a href="#" class="tip" title="back to dashboard">
+								<span class="icon16 icomoon-icon-screen"></span>
+							</a> 
+							<span class="divider">
+								<span class="icon16 icomoon-icon-arrow-right"></span>
+							</span>
+						</li>
+						<li class="active"><?php echo $page; ?></li>
+					</ul>
+				
+				</div><!-- End .heading-->
+				
+				<!-- Build page from here: Usual with <div class="row-fluid"></div> -->
+				
+					<div class="row-fluid">
+						<div class="span12">
+							<div class="box">
+								<form class="form-horizontal" id="form-validate" action="" method="post" enctype="multipart/form-data">
+								<input type='hidden' name='token' id='token' value='<?php echo Token::generate();?>'>
+								<div class="title">
+									<h4>
+										<span class="icon16 brocco-icon-grid"></span>
+										<span>User Form</span>
+									</h4>
+								</div>
+								<div class="content">
+									<?php if(Session::exists('alert')) { echo Session::flash('alert'); } ?>
+									<div class="page-header">
+										<h4>Personal Information <small></small></h4>
+									</div>  
+									<div class="form-row row-fluid">  
+										<div class="span12">
+											<div class="row-fluid">
+												<label class="form-label span3" >Name</label>
+												<input class="span4" id="name" name="name" type="text" style="text-transform: uppercase" autocomplete="off" value="<?php echo escape(Input::get('name')); ?>" required/>
+											</div>
+											<div class="row-fluid">
+												<label class="form-label span3" >Username</label>
+												<input class="span4" id="username" name="username" type="text" autocomplete="off" value="<?php echo escape(Input::get('username')); ?>" required/>
+											</div> 
+											<div class="row-fluid">
+												<label class="form-label span3" >Password</label>
+												<input class="span4" id="password" name="password" type="password" required/>
+											</div> 
+											<div class="row-fluid">
+												<label class="form-label span3" >Repeat Password</label>
+												<input class="span4" id="password_again" name="password_again" type="password" required/>
+											</div> 
+											<div class="row-fluid">
+												<label class="form-label span3" >Access</label>                  
+												<select class="nostyle span4" id="position" name="position">  
+												<?php echo $option_positions; ?>                    
+												</select>   
+											</div>
+										</div>  
+										<div class="row-fluid">
+											<label class="form-label span3" >Email</label>
+											<input class="span4" id="email" name="email" type="text" autocomplete="off" value="<?php echo escape(Input::get('email')); ?>" required/>
+										</div> 
+										<div class="row-fluid">
+											<label class="form-label span3" >Office#</label>
+											<input class="span4" id="office_no" name="office_no" type="text" autocomplete="off" value="<?php echo escape(Input::get('office_no')); ?>" required/>
+										</div> 
+										<div class="row-fluid">
+											<label class="form-label span3" >Mobile#</label>
+											<input class="span4" id="mobile_no" name="mobile_no" type="text" autocomplete="off" value="<?php echo escape(Input::get('mobile_no')); ?>" required/>
+										</div> 
+										<div class="row-fluid">
+											<label class="form-label span3" >Picture</label>                  
+											<input type="file" name="picture" id="picture" value=""> 
+										</div>
+									</div>      
+                                    <div class="page-header">
+                                        <h4>Security Question <small></small></h4>
+                                    </div>                              
+                                    <div class="form-row row-fluid">
+                                        <div class="span12">    
+                                            <div class="row-fluid">
+                                                <label class="form-label span3" >Security Question</label>
+                                                <select class="nostyle span4" id="question" name="question">
+                                                <?php echo $option_questions; ?>
+                                                </select>
+                                            </div>
+                                            <div class="row-fluid">
+                                                <label class="form-label span3" >Security Answer</label>
+                                                <input class="span4" id="answer" name="answer" type="text" style="text-transform: uppercase" value="<?php echo escape(Input::get('answer')); ?>" required/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-row row-fluid">         
+                                        <div class="span12">
+                                            <div class="row-fluid">
+                                                <div class="form-actions">  
+                                                    <div class="span3"></div>
+                                                    <div class="span9 controls">  
+                                                        <button class="btn marginR10" type="submit">Save changes</button>
+                                                        <button class="btn btn-danger" onclick="location.href='dashboard.php'">Cancel</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>  
+                                    </div>          
+								</div>        
+							</form>
+							</div><!-- End .box -->
+						</div><!-- End .span12 -->
+					</div><!-- End .row-fluid -->    
+				<!-- Page end here -->  
+		
+			</div><!-- End contentwrapper -->
+		</div><!-- End #content -->
+
+		<?php include_once 'includes/footer.php';?>
+
+	</body>
+</html>
